@@ -6,23 +6,40 @@
         <div class="flex">
           <div class="max-w-xs">
             <label for="wallet" class="block text-sm font-medium text-gray-700"
-            >Тикер</label
+              >Тикер</label
             >
             <div class="mt-1 relative rounded-md shadow-md">
               <input
                 v-model="ticker"
-                @keydown.enter="add"
+                @keydown.enter="add(ticker)"
                 type="text"
                 name="wallet"
                 id="wallet"
                 class="block w-full pr-10 border-gray-300 text-gray-900 focus:outline-none focus:ring-gray-500 focus:border-gray-500 sm:text-sm rounded-md"
                 placeholder="Например DOGE"
+                @input="isErrorMessage = false"
               />
+              <div
+                v-if="ticker && resultsTickers.length"
+                class="flex bg-white shadow-md p-1 rounded-md shadow-md flex-wrap"
+              >
+                <span
+                  v-for="coin in resultsTickers"
+                  :key="coin.Id"
+                  class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
+                  @click="add(coin.Symbol)"
+                >
+                  {{ coin.Symbol }}
+                </span>
+              </div>
+              <div v-if="isErrorMessage" class="text-sm text-red-600">
+                Такой тикер уже добавлен
+              </div>
             </div>
           </div>
         </div>
         <button
-          @click="add"
+          @click="add(ticker)"
           type="button"
           class="my-4 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
         >
@@ -134,7 +151,7 @@
             x="0"
             y="0"
             viewBox="0 0 511.76 511.76"
-            style="enable-background:new 0 0 512 512"
+            style="enable-background: new 0 0 512 512"
             xml:space="preserve"
           >
             <g>
@@ -170,6 +187,7 @@
 // [x] При удалении тикера остается выбор
 
 import { subscribeToTicker, unsubscribeFromTicker } from "./api/api";
+import { getCoinLis } from "./api/getCoinList";
 
 export default {
   name: "App",
@@ -182,6 +200,11 @@ export default {
       tickers: [],
       selectedTicker: null,
 
+      coinList: [],
+
+      errorMessage: "Такой тикер уже добавлен",
+      isErrorMessage: false,
+
       graph: [],
       maxGraphElements: 1,
 
@@ -189,14 +212,14 @@ export default {
     };
   },
 
-  created() {
+  async created() {
     const windowData = Object.fromEntries(
       new URL(window.location).searchParams.entries()
     );
 
     const VALID_KEYS = ["filter", "page"];
 
-    VALID_KEYS.forEach(key => {
+    VALID_KEYS.forEach((key) => {
       if (windowData[key]) {
         this[key] = windowData[key];
       }
@@ -204,10 +227,12 @@ export default {
 
     const tickersData = localStorage.getItem("cryptonomicon-list");
 
+    await this.getCoinList();
+
     if (tickersData) {
       this.tickers = JSON.parse(tickersData);
-      this.tickers.forEach(ticker => {
-        subscribeToTicker(ticker.name, newPrice =>
+      this.tickers.forEach((ticker) => {
+        subscribeToTicker(ticker.name, (newPrice) =>
           this.updateTicker(ticker.name, newPrice)
         );
       });
@@ -232,7 +257,7 @@ export default {
     },
 
     filteredTickers() {
-      return this.tickers.filter(ticker => ticker.name.includes(this.filter));
+      return this.tickers.filter((ticker) => ticker.name.includes(this.filter));
     },
 
     paginatedTickers() {
@@ -252,7 +277,7 @@ export default {
       }
 
       return this.graph.map(
-        price => 5 + ((price - minValue) * 95) / (maxValue - minValue)
+        (price) => 5 + ((price - minValue) * 95) / (maxValue - minValue)
       );
     },
 
@@ -261,10 +286,35 @@ export default {
         filter: this.filter,
         page: this.page
       };
+    },
+
+    resultsTickers() {
+      if (!this.ticker) return [];
+
+      const correctNewTicker = this.ticker.toUpperCase();
+
+      return Object.values(this.coinList)
+        .filter((coin) => {
+          return (
+            coin.Symbol === correctNewTicker ||
+            coin.FullName.includes(correctNewTicker)
+          );
+        })
+        .slice(0, 4);
     }
   },
 
   methods: {
+    async getCoinList() {
+      const savedCoinList = JSON.parse(localStorage.getItem("coinList"));
+
+      if (savedCoinList) this.coinList = savedCoinList;
+      else {
+        this.coinList = await getCoinLis();
+        localStorage.setItem("coinList", JSON.stringify(this.coinList));
+      }
+    },
+
     calculateMaxGraphElements() {
       if (!this.$refs.graph) {
         return;
@@ -275,12 +325,14 @@ export default {
 
     updateTicker(tickerName, price) {
       this.tickers
-        .filter(t => t.name === tickerName)
-        .forEach(t => {
+        .filter((t) => t.name === tickerName)
+        .forEach((t) => {
           if (t === this.selectedTicker) {
             this.graph.push(price);
-            while (this.graph.length > this.maxGraphElements) {
-              this.graph.shift();
+            if (this.graph.length > this.maxGraphElements) {
+              const startIndex = this.graph.length - this.maxGraphElements;
+
+              this.graph = this.graph.slice(startIndex, this.graph.length);
             }
           }
           t.price = price;
@@ -294,16 +346,29 @@ export default {
       return price > 1 ? price.toFixed(2) : price.toPrecision(2);
     },
 
-    add() {
+    add(newTicker) {
+      const correctNewTicker = newTicker.toUpperCase();
+
+      this.isErrorMessage = this.tickers.some(
+        (ticker) => ticker.name === correctNewTicker
+      );
+
+      if (this.isErrorMessage) {
+        this.ticker = this.tickers.find(
+          (ticker) => ticker.name === correctNewTicker
+        ).name;
+        return;
+      }
+
       const currentTicker = {
-        name: this.ticker,
+        name: correctNewTicker,
         price: "-"
       };
 
       this.tickers = [...this.tickers, currentTicker];
       this.ticker = "";
       this.filter = "";
-      subscribeToTicker(currentTicker.name, newPrice =>
+      subscribeToTicker(currentTicker.name, (newPrice) =>
         this.updateTicker(currentTicker.name, newPrice)
       );
     },
@@ -313,7 +378,7 @@ export default {
     },
 
     handleDelete(tickerToRemove) {
-      this.tickers = this.tickers.filter(t => t !== tickerToRemove);
+      this.tickers = this.tickers.filter((t) => t !== tickerToRemove);
       if (this.selectedTicker === tickerToRemove) {
         this.selectedTicker = null;
       }
