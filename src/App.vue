@@ -230,6 +230,3 @@ export default {
   components: {}
 };
 </script>
-
-<style src="./app.css">
-</style>
