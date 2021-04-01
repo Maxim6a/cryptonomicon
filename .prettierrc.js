@@ -7,6 +7,6 @@ module.exports = {
   arrowParens: 'always',
   proseWrap: 'preserve',
   vueIndentScriptAndStyle: true,
-  endOfLine: 'crlf',
+  endOfLine: 'auto',
   embeddedLanguageFormatting: 'auto'
 };
