@@ -43,7 +43,6 @@
           type="button"
           class="my-4 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
         >
-
           <svg
             class="-ml-0.5 mr-2 h-6 w-6"
             xmlns="http://www.w3.org/2000/svg"
@@ -114,8 +113,9 @@
                   fill-rule="evenodd"
                   d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
                   clip-rule="evenodd"
-                ></path></svg
-              >Удалить
+                ></path>
+              </svg>
+              Удалить
             </button>
           </div>
         </dl>
@@ -169,253 +169,260 @@
 </template>
 
 <script>
-// H - homework - домашнее задание
+  // H - homework - домашнее задание
 
-// [x] 6. Наличие в состоянии ЗАВИСИМЫХ ДАННЫХ | Критичность: 5+
-// [x] 4. Запросы напрямую внутри компонента (???) | Критичность: 5
-// [x] 2. При удалении остается подписка на загрузку тикера | Критичность: 5
-// [H] 5. Обработка ошибок API | Критичность: 5
-// [х] 3. Количество запросов | Критичность: 4
-// [x] 8. При удалении тикера не изменяется localStorage | Критичность: 4
-// [x] 1. Одинаковый код в watch | Критичность: 3
-// [ ] 9. localStorage и анонимные вкладки | Критичность: 3
-// [x] 7. График ужасно выглядит если будет много цен | Критичность: 2
-// [ ] 10. Магические строки и числа (URL, 5000 миллисекунд задержки, ключ локал стораджа, количество на странице) |  Критичность: 1
+  // [x] 6. Наличие в состоянии ЗАВИСИМЫХ ДАННЫХ | Критичность: 5+
+  // [x] 4. Запросы напрямую внутри компонента (???) | Критичность: 5
+  // [x] 2. При удалении остается подписка на загрузку тикера | Критичность: 5
+  // [H] 5. Обработка ошибок API | Критичность: 5
+  // [х] 3. Количество запросов | Критичность: 4
+  // [x] 8. При удалении тикера не изменяется localStorage | Критичность: 4
+  // [x] 1. Одинаковый код в watch | Критичность: 3
+  // [ ] 9. localStorage и анонимные вкладки | Критичность: 3
+  // [x] 7. График ужасно выглядит если будет много цен | Критичность: 2
+  // [ ] 10. Магические строки и числа (URL, 5000 миллисекунд задержки, ключ localStorage, количество на странице) |  Критичность: 1
 
-// Параллельно
-// [x] График сломан если везде одинаковые значения
-// [x] При удалении тикера остается выбор
+  // Параллельно
+  // [x] График сломан если везде одинаковые значения
+  // [x] При удалении тикера остается выбор
 
-import { subscribeToTicker, unsubscribeFromTicker } from "./api/api";
-import { getCoinLis } from "./api/getCoinList";
+  import { subscribeToTicker, unsubscribeFromTicker } from './api/api';
+  import { getCoinLis } from './api/getCoinList';
 
-export default {
-  name: "App",
+  export default {
+    name: 'App',
 
-  data() {
-    return {
-      ticker: "",
-      filter: "",
-
-      tickers: [],
-      selectedTicker: null,
-
-      coinList: [],
-
-      errorMessage: "Такой тикер уже добавлен",
-      isErrorMessage: false,
-
-      graph: [],
-      maxGraphElements: 1,
-
-      page: 1
-    };
-  },
-
-  async created() {
-    const windowData = Object.fromEntries(
-      new URL(window.location).searchParams.entries()
-    );
-
-    const VALID_KEYS = ["filter", "page"];
-
-    VALID_KEYS.forEach((key) => {
-      if (windowData[key]) {
-        this[key] = windowData[key];
-      }
-    });
-
-    const tickersData = localStorage.getItem("cryptonomicon-list");
-
-    await this.getCoinList();
-
-    if (tickersData) {
-      this.tickers = JSON.parse(tickersData);
-      this.tickers.forEach((ticker) => {
-        subscribeToTicker(ticker.name, (newPrice) =>
-          this.updateTicker(ticker.name, newPrice)
-        );
-      });
-    }
-  },
-
-  mounted() {
-    window.addEventListener("resize", this.calculateMaxGraphElements);
-  },
-
-  beforeUnmount() {
-    window.removeEventListener("resize", this.calculateMaxGraphElements);
-  },
-
-  computed: {
-    startIndex() {
-      return (this.page - 1) * 6;
-    },
-
-    endIndex() {
-      return this.page * 6;
-    },
-
-    filteredTickers() {
-      return this.tickers.filter((ticker) => ticker.name.includes(this.filter));
-    },
-
-    paginatedTickers() {
-      return this.filteredTickers.slice(this.startIndex, this.endIndex);
-    },
-
-    hasNextPage() {
-      return this.filteredTickers.length > this.endIndex;
-    },
-
-    normalizedGraph() {
-      const maxValue = Math.max(...this.graph);
-      const minValue = Math.min(...this.graph);
-
-      if (maxValue === minValue) {
-        return this.graph.map(() => 50);
-      }
-
-      return this.graph.map(
-        (price) => 5 + ((price - minValue) * 95) / (maxValue - minValue)
-      );
-    },
-
-    pageStateOptions() {
+    data() {
       return {
-        filter: this.filter,
-        page: this.page
+        ticker: '',
+        filter: '',
+
+        tickers: [],
+        selectedTicker: null,
+
+        coinList: [],
+        keyCoinList: 'coinList',
+
+        errorMessage: 'Такой тикер уже добавлен',
+        isErrorMessage: false,
+
+        graph: [],
+        maxGraphElements: 1,
+
+        page: 1
       };
     },
 
-    resultsTickers() {
-      if (!this.ticker) return [];
+    async created() {
+      const windowData = Object.fromEntries(
+        new URL(window.location).searchParams.entries()
+      );
 
-      const correctNewTicker = this.ticker.toUpperCase();
+      const VALID_KEYS = ['filter', 'page'];
 
-      return Object.values(this.coinList)
-        .filter((coin) => {
-          return (
-            coin.Symbol === correctNewTicker ||
-            coin.FullName.includes(correctNewTicker)
+      VALID_KEYS.forEach((key) => {
+        if (windowData[key]) {
+          this[key] = windowData[key];
+        }
+      });
+
+      const tickersData = localStorage.getItem('cryptonomicon-list');
+
+      await this.getCoinList();
+
+      if (tickersData) {
+        this.tickers = JSON.parse(tickersData);
+        this.tickers.forEach((ticker) => {
+          subscribeToTicker(ticker.name, (newPrice) =>
+            this.updateTicker(ticker.name, newPrice)
           );
-        })
-        .slice(0, 4);
-    }
-  },
-
-  methods: {
-    async getCoinList() {
-      const savedCoinList = JSON.parse(localStorage.getItem("coinList"));
-
-      if (savedCoinList) this.coinList = savedCoinList;
-      else {
-        this.coinList = await getCoinLis();
-        localStorage.setItem("coinList", JSON.stringify(this.coinList));
-      }
-    },
-
-    calculateMaxGraphElements() {
-      if (!this.$refs.graph) {
-        return;
-      }
-
-      this.maxGraphElements = this.$refs.graph.clientWidth / 38;
-    },
-
-    updateTicker(tickerName, price) {
-      this.tickers
-        .filter((t) => t.name === tickerName)
-        .forEach((t) => {
-          if (t === this.selectedTicker) {
-            this.graph.push(price);
-            if (this.graph.length > this.maxGraphElements) {
-              const startIndex = this.graph.length - this.maxGraphElements;
-
-              this.graph = this.graph.slice(startIndex, this.graph.length);
-            }
-          }
-          t.price = price;
         });
-    },
-
-    formatPrice(price) {
-      if (price === "-") {
-        return price;
       }
-      return price > 1 ? price.toFixed(2) : price.toPrecision(2);
     },
 
-    add(newTicker) {
-      const correctNewTicker = newTicker.toUpperCase();
+    mounted() {
+      window.addEventListener('resize', this.calculateMaxGraphElements);
+    },
 
-      this.isErrorMessage = this.tickers.some(
-        (ticker) => ticker.name === correctNewTicker
-      );
+    beforeUnmount() {
+      window.removeEventListener('resize', this.calculateMaxGraphElements);
+    },
 
-      if (this.isErrorMessage) {
-        this.ticker = this.tickers.find(
+    computed: {
+      startIndex() {
+        return (this.page - 1) * 6;
+      },
+
+      endIndex() {
+        return this.page * 6;
+      },
+
+      filteredTickers() {
+        return this.tickers.filter((ticker) =>
+          ticker.name.includes(this.filter)
+        );
+      },
+
+      paginatedTickers() {
+        return this.filteredTickers.slice(this.startIndex, this.endIndex);
+      },
+
+      hasNextPage() {
+        return this.filteredTickers.length > this.endIndex;
+      },
+
+      normalizedGraph() {
+        const maxValue = Math.max(...this.graph);
+        const minValue = Math.min(...this.graph);
+
+        if (maxValue === minValue) {
+          return this.graph.map(() => 50);
+        }
+
+        return this.graph.map(
+          (price) => 5 + ((price - minValue) * 95) / (maxValue - minValue)
+        );
+      },
+
+      pageStateOptions() {
+        return {
+          filter: this.filter,
+          page: this.page
+        };
+      },
+
+      resultsTickers() {
+        if (!this.ticker) return [];
+
+        const correctNewTicker = this.ticker.toUpperCase();
+
+        return Object.values(this.coinList)
+          .filter((coin) => {
+            return (
+              coin.Symbol === correctNewTicker ||
+              coin.FullName.includes(correctNewTicker)
+            );
+          })
+          .slice(0, 4);
+      }
+    },
+
+    methods: {
+      async getCoinList() {
+        const savedCoinList = JSON.parse(
+          localStorage.getItem(this.keyCoinList)
+        );
+
+        if (savedCoinList) this.coinList = savedCoinList;
+        else {
+          this.coinList = await getCoinLis();
+          localStorage.setItem(this.keyCoinList, JSON.stringify(this.coinList));
+        }
+      },
+
+      calculateMaxGraphElements() {
+        if (!this.$refs.graph) {
+          return;
+        }
+
+        this.maxGraphElements = this.$refs.graph.clientWidth / 38;
+      },
+
+      updateTicker(tickerName, price) {
+        this.tickers
+          .filter((t) => t.name === tickerName)
+          .forEach((t) => {
+            if (t === this.selectedTicker) {
+              this.graph.push(price);
+              if (this.graph.length > this.maxGraphElements) {
+                const startIndex = this.graph.length - this.maxGraphElements;
+
+                this.graph = this.graph.slice(startIndex, this.graph.length);
+              }
+            }
+            t.price = price;
+          });
+      },
+
+      formatPrice(price) {
+        if (price === '-') {
+          return price;
+        }
+        return price > 1 ? price.toFixed(2) : price.toPrecision(2);
+      },
+
+      add(newTicker) {
+        const correctNewTicker = newTicker.toUpperCase();
+
+        this.isErrorMessage = this.tickers.some(
           (ticker) => ticker.name === correctNewTicker
-        ).name;
-        return;
+        );
+
+        if (this.isErrorMessage) {
+          this.ticker = this.tickers.find(
+            (ticker) => ticker.name === correctNewTicker
+          ).name;
+          return;
+        }
+
+        const currentTicker = {
+          name: correctNewTicker,
+          price: '-'
+        };
+
+        this.tickers = [...this.tickers, currentTicker];
+        this.ticker = '';
+        this.filter = '';
+        subscribeToTicker(currentTicker.name, (newPrice) =>
+          this.updateTicker(currentTicker.name, newPrice)
+        );
+      },
+
+      select(ticker) {
+        this.selectedTicker = ticker;
+      },
+
+      handleDelete(tickerToRemove) {
+        this.tickers = this.tickers.filter((t) => t !== tickerToRemove);
+        if (this.selectedTicker === tickerToRemove) {
+          this.selectedTicker = null;
+        }
+        unsubscribeFromTicker(tickerToRemove.name);
       }
-
-      const currentTicker = {
-        name: correctNewTicker,
-        price: "-"
-      };
-
-      this.tickers = [...this.tickers, currentTicker];
-      this.ticker = "";
-      this.filter = "";
-      subscribeToTicker(currentTicker.name, (newPrice) =>
-        this.updateTicker(currentTicker.name, newPrice)
-      );
     },
 
-    select(ticker) {
-      this.selectedTicker = ticker;
-    },
+    watch: {
+      selectedTicker() {
+        this.graph = [];
 
-    handleDelete(tickerToRemove) {
-      this.tickers = this.tickers.filter((t) => t !== tickerToRemove);
-      if (this.selectedTicker === tickerToRemove) {
-        this.selectedTicker = null;
+        this.$nextTick().then(this.calculateMaxGraphElements);
+      },
+
+      tickers() {
+        // Почему не сработал watch при добавлении?
+        localStorage.setItem(
+          'cryptonomicon-list',
+          JSON.stringify(this.tickers)
+        );
+      },
+
+      paginatedTickers() {
+        if (this.paginatedTickers.length === 0 && this.page > 1) {
+          this.page -= 1;
+        }
+      },
+
+      filter() {
+        this.page = 1;
+      },
+
+      pageStateOptions(value) {
+        window.history.pushState(
+          null,
+          document.title,
+          `${window.location.pathname}?filter=${value.filter}&page=${value.page}`
+        );
       }
-      unsubscribeFromTicker(tickerToRemove.name);
     }
-  },
-
-  watch: {
-    selectedTicker() {
-      this.graph = [];
-
-      this.$nextTick().then(this.calculateMaxGraphElements);
-    },
-
-    tickers(newValue, oldValue) {
-      // Почему не сработал watch при добавлении?
-      console.log(newValue === oldValue);
-      localStorage.setItem("cryptonomicon-list", JSON.stringify(this.tickers));
-    },
-
-    paginatedTickers() {
-      if (this.paginatedTickers.length === 0 && this.page > 1) {
-        this.page -= 1;
-      }
-    },
-
-    filter() {
-      this.page = 1;
-    },
-
-    pageStateOptions(value) {
-      window.history.pushState(
-        null,
-        document.title,
-        `${window.location.pathname}?filter=${value.filter}&page=${value.page}`
-      );
-    }
-  }
-};
+  };
 </script>
