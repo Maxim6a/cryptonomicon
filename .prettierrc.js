@@ -1,3 +1,12 @@
 module.exports = {
-  trailingComma: "none"
-}
+  trailingComma: 'none',
+  semi: true,
+  singleQuote: true,
+  bracketSpacing: true,
+  jsxBracketSameLine: true,
+  arrowParens: 'always',
+  proseWrap: 'preserve',
+  vueIndentScriptAndStyle: true,
+  endOfLine: 'crlf',
+  embeddedLanguageFormatting: 'auto'
+};
