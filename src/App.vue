@@ -84,9 +84,11 @@
             v-for="t in paginatedTickers"
             :key="t.name"
             @click="select(t)"
-            :class="{
-              'border-4': selectedTicker === t
-            }"
+            :class="[
+              {
+                'border-4': selectedTicker === t
+              }
+            ]"
             class="bg-white overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer"
           >
             <div class="px-4 py-5 sm:p-6 text-center">
@@ -367,7 +369,8 @@
 
         const currentTicker = {
           name: correctNewTicker,
-          price: '-'
+          price: '-',
+          type: ''
         };
 
         this.tickers = [...this.tickers, currentTicker];
