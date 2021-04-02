@@ -87,9 +87,10 @@
             :class="[
               {
                 'border-4': selectedTicker === t
-              }
+              },
+              t.price === '-' ? 'bg-red-100' : 'bg-white'
             ]"
-            class="bg-white overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer"
+            class="overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer"
           >
             <div class="px-4 py-5 sm:p-6 text-center">
               <dt class="text-sm font-medium text-gray-500 truncate">
@@ -369,8 +370,7 @@
 
         const currentTicker = {
           name: correctNewTicker,
-          price: '-',
-          type: ''
+          price: '-'
         };
 
         this.tickers = [...this.tickers, currentTicker];
