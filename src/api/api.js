@@ -9,13 +9,20 @@ const socket = new WebSocket(
 const AGGREGATE_INDEX = '5';
 const keyActionAdd = 'SubAdd';
 const keyActionRemove = 'SubRemove';
+let isAttemptConverter = false;
+let currentNameTicker = '';
 
 socket.addEventListener('message', (e) => {
   const { TYPE: type, FROMSYMBOL: currency, PRICE: newPrice } = JSON.parse(
     e.data
   );
 
+  if (!isAttemptConverter && +type === 500) {
+    converterTicker(currentNameTicker);
+  }
+
   if (type !== AGGREGATE_INDEX || newPrice === undefined) {
+    isAttemptConverter = false;
     return;
   }
 
@@ -40,15 +47,20 @@ function sendToWebSocket(message) {
   );
 }
 
+function converterTicker(ticker) {
+  isAttemptConverter = true;
+  sendToWebSocket(getSubscriptionMessage(keyActionAdd, ticker, 'BTC'));
+}
+
 function subscribeToTickerOnWs(ticker) {
-  sendToWebSocket(subscriptionMessage(keyActionAdd, ticker));
+  sendToWebSocket(getSubscriptionMessage(keyActionAdd, ticker));
 }
 
 function unsubscribeFromTickerOnWs(ticker) {
-  sendToWebSocket(subscriptionMessage(keyActionRemove, ticker));
+  sendToWebSocket(getSubscriptionMessage(keyActionRemove, ticker));
 }
 
-export const subscriptionMessage = (action, ticker, sub = 'USD') => {
+export const getSubscriptionMessage = (action, ticker, sub = 'USD') => {
   return {
     action: `${action}`,
     subs: [`5~CCCAGG~${ticker}~${sub}`]
@@ -56,6 +68,8 @@ export const subscriptionMessage = (action, ticker, sub = 'USD') => {
 };
 
 export const subscribeToTicker = (ticker, cb) => {
+  currentNameTicker = ticker;
+
   const subscribers = tickersHandlers.get(ticker) || [];
   tickersHandlers.set(ticker, [...subscribers, cb]);
   subscribeToTickerOnWs(ticker);
