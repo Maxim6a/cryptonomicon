@@ -1,3 +1,5 @@
+// import { getCurrentBTC } from '@/api/getCurrentBTC';
+
 const API_KEY =
   'd6da2c95a64e83577796ab2de98e3b8613a052b5f2c3e45b73af5177d7f599bd';
 
@@ -7,25 +9,15 @@ const socket = new WebSocket(
 );
 
 const AGGREGATE_INDEX = '5';
+const ERROR_INDEX = '500';
 const keyActionAdd = 'SubAdd';
 const keyActionRemove = 'SubRemove';
-let isAttemptConverter = false;
-let currentNameTicker = '';
 
-socket.addEventListener('message', (e) => {
+socket.addEventListener('message', async (e) => {
   const { TYPE: type, FROMSYMBOL: currency, PRICE: newPrice } = JSON.parse(
     e.data
   );
-
-  if (!isAttemptConverter && +type === 500) {
-    converterTicker(currentNameTicker);
-  }
-
-  if (type !== AGGREGATE_INDEX || newPrice === undefined) {
-    isAttemptConverter = false;
-    return;
-  }
-
+  console.log(type, ERROR_INDEX, AGGREGATE_INDEX);
   const handlers = tickersHandlers.get(currency) ?? [];
   handlers.forEach((fn) => fn(newPrice));
 });
@@ -47,11 +39,6 @@ function sendToWebSocket(message) {
   );
 }
 
-function converterTicker(ticker) {
-  isAttemptConverter = true;
-  sendToWebSocket(getSubscriptionMessage(keyActionAdd, ticker, 'BTC'));
-}
-
 function subscribeToTickerOnWs(ticker) {
   sendToWebSocket(getSubscriptionMessage(keyActionAdd, ticker));
 }
@@ -68,8 +55,6 @@ export const getSubscriptionMessage = (action, ticker, sub = 'USD') => {
 };
 
 export const subscribeToTicker = (ticker, cb) => {
-  currentNameTicker = ticker;
-
   const subscribers = tickersHandlers.get(ticker) || [];
   tickersHandlers.set(ticker, [...subscribers, cb]);
   subscribeToTickerOnWs(ticker);
